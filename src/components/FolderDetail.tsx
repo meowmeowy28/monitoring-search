@@ -56,7 +56,7 @@ export default function FolderDetail({ entry, onClose, onDeleted }: FolderDetail
           </button>
         </div>
 
-        <div className="px-6 py-4 space-y-2 text-sm border-b border-border">
+        <div className="px-4 sm:px-6 py-4 space-y-2 text-sm border-b border-border">
           <div className="flex items-center gap-2 opacity-80">
             <MapPin className="w-4 h-4 shrink-0" />
             <span>
@@ -117,7 +117,7 @@ export default function FolderDetail({ entry, onClose, onDeleted }: FolderDetail
         </div>
 
         {entry.folderLink && (
-          <div className="px-6 pb-3">
+          <div className="px-4 sm:px-6 pb-3">
             <a
               href={entry.folderLink}
               target="_blank"
@@ -131,7 +131,7 @@ export default function FolderDetail({ entry, onClose, onDeleted }: FolderDetail
         )}
 
         {entry.folderLink && (
-          <div className="px-6 pb-6">
+          <div className="px-4 sm:px-6 pb-6">
             <DeleteFolderButton folderLink={entry.folderLink} onDeleted={onDeleted} />
           </div>
         )}

@@ -30,7 +30,7 @@ function doGet(e) {
     return getFolderPhotos(e.parameter.folderId);
   }
 
-  // Cache the sheet listing for 60 seconds — repeated page loads/refreshes
+  // Cache the sheet listing for 4 minutes — repeated page loads/refreshes
   // (from you or anyone else browsing) hit this cache instead of re-reading
   // the whole Sheet every single time, which is the slowest part of a read.
   const cache = CacheService.getScriptCache();
@@ -57,7 +57,7 @@ function doGet(e) {
     });
 
   const json = JSON.stringify(rows);
-  cache.put("sheet_data", json, 60); // 60 seconds
+  cache.put("sheet_data", json, 240); // 4 minutes — well under the 5-minute sync cycle
   return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
 }
 

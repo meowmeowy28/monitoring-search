@@ -38,7 +38,7 @@ export default function SearchBar({
   };
 
   return (
-    <div className="flex flex-col gap-3 px-6 py-4 border-b border-border">
+    <div className="flex flex-col gap-3 px-4 sm:px-6 py-4 border-b border-border">
       {/* main search bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 opacity-40" />

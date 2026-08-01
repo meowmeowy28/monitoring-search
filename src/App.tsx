@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search as SearchIcon, FolderX, AlertCircle, Camera as CameraIcon, Plus } from "lucide-react";
+import { Search as SearchIcon, FolderX, AlertCircle, Camera as CameraIcon, Plus, Menu } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import SearchBar, { type SortKey } from "@/components/SearchBar";
 import FolderCard from "@/components/FolderCard";
@@ -23,6 +23,7 @@ export default function App() {
 
   const [selected, setSelected] = useState<(Entry & { id: string }) | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const hasSearched = Boolean(query.trim() || brandFilter || departmentFilter);
 
@@ -89,27 +90,41 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground">
-      <header className="border-b border-border px-6 py-3 flex items-center gap-3 shrink-0 bg-primary text-primary-foreground">
+      <header className="border-b border-border px-4 sm:px-6 py-3 flex items-center gap-2 sm:gap-3 shrink-0 bg-primary text-primary-foreground">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="md:hidden p-1.5 -ml-1 rounded-md hover:bg-white/10"
+          aria-label="Open folder browser"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
         <div className="w-8 h-8 rounded-md bg-gradient-to-br from-accent-indigo to-accent-cyan flex items-center justify-center shrink-0">
           <CameraIcon className="w-4 h-4 text-white" />
         </div>
-        <div>
-          <h1 className="font-display text-lg font-bold leading-tight">Site Monitor</h1>
+        <div className="min-w-0">
+          <h1 className="font-display text-lg font-bold leading-tight truncate">Site Monitor</h1>
           <p className="text-xs opacity-60">
             {loading ? "Loading..." : `${entries.length} entries`}
           </p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="ml-auto flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
+          className="ml-auto flex items-center gap-1.5 text-sm px-2.5 sm:px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors shrink-0"
         >
           <Plus className="w-4 h-4" />
-          Add Folder
+          <span className="hidden sm:inline">Add Folder</span>
         </button>
       </header>
 
       <div className="flex flex-1 min-h-0">
-        <Sidebar entries={entries} selectedId={selected?.id ?? null} onSelect={setSelected} />
+        <Sidebar
+          entries={entries}
+          selectedId={selected?.id ?? null}
+          onSelect={setSelected}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
 
         <main className="flex-1 min-w-0 flex flex-col">
           <SearchBar
@@ -125,12 +140,7 @@ export default function App() {
           />
 
           <div className="flex-1 overflow-y-auto p-6">
-            {loading && (
-              <div className="flex items-center gap-2 text-sm opacity-50">
-                <div className="w-3.5 h-3.5 border-2 border-accent-indigo border-t-transparent rounded-full animate-spin" />
-                Loading entries...
-              </div>
-            )}
+            {loading && <LoadingMessage />}
 
             {loadError && (
               <div className="flex items-start gap-3 rounded-lg border border-status-danger/30 bg-status-danger-light px-4 py-3">
@@ -182,6 +192,28 @@ export default function App() {
           onAdded={loadEntries}
         />
       )}
+    </div>
+  );
+}
+
+// Shows a plain spinner at first, but if loading drags on (the Apps Script
+// backend "waking up" from being idle can take 10-20+ seconds occasionally),
+// switches to a reassuring message instead of leaving people wondering if
+// the site is broken.
+function LoadingMessage() {
+  const [showReassurance, setShowReassurance] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowReassurance(true), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 text-sm opacity-50">
+      <div className="w-3.5 h-3.5 border-2 border-accent-indigo border-t-transparent rounded-full animate-spin shrink-0" />
+      {showReassurance
+        ? "Still loading — the first load of the day can take up to 30 seconds while the backend wakes up."
+        : "Loading entries..."}
     </div>
   );
 }

@@ -8,9 +8,11 @@ interface SidebarProps {
   entries: (Entry & { id: string })[];
   selectedId: string | null;
   onSelect: (entry: Entry & { id: string }) => void;
+  open: boolean;
+  onClose: () => void;
 }
 
-export default function Sidebar({ entries, selectedId, onSelect }: SidebarProps) {
+export default function Sidebar({ entries, selectedId, onSelect, open, onClose }: SidebarProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const byBrand = useMemo(() => {
@@ -41,7 +43,22 @@ export default function Sidebar({ entries, selectedId, onSelect }: SidebarProps)
   };
 
   return (
-    <aside className="w-64 shrink-0 border-r border-border h-full overflow-y-auto py-3">
+    <>
+      {/* backdrop — mobile only, closes the drawer on tap */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "w-64 shrink-0 border-r border-border overflow-y-auto py-3 bg-background",
+          "fixed inset-y-0 left-0 z-40 transition-transform duration-200 md:static md:translate-x-0 md:z-auto",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
       <div className="px-4 pb-2 text-xs font-semibold uppercase tracking-wide opacity-50">
         All Folders
       </div>
@@ -74,7 +91,10 @@ export default function Sidebar({ entries, selectedId, onSelect }: SidebarProps)
                   {list.map((entry) => (
                     <button
                       key={entry.id}
-                      onClick={() => onSelect(entry)}
+                      onClick={() => {
+                        onSelect(entry);
+                        onClose();
+                      }}
                       className={cn(
                         "w-full flex items-center gap-2 pl-5 pr-4 py-1.5 text-sm text-left transition-colors",
                         selectedId === entry.id
@@ -95,6 +115,7 @@ export default function Sidebar({ entries, selectedId, onSelect }: SidebarProps)
           );
         })}
       </nav>
-    </aside>
+      </aside>
+    </>
   );
 }

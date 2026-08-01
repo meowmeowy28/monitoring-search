@@ -78,7 +78,7 @@ export default function AddEntryModal({ onClose, onAdded }: AddEntryModalProps) 
           </button>
         </div>
 
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-4 sm:px-6 py-4 space-y-4">
           <Field label="Brand" required value={brand} onChange={setBrand} placeholder="e.g. BYD" />
           <Field label="Site" required value={site} onChange={setSite} placeholder="e.g. Balintawak" />
           <div className="grid grid-cols-2 gap-3">
@@ -124,7 +124,7 @@ export default function AddEntryModal({ onClose, onAdded }: AddEntryModalProps) 
           {error && <p className="text-sm text-status-danger">{error}</p>}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border sticky bottom-0 bg-background">
+        <div className="flex items-center justify-end gap-2 px-4 sm:px-6 py-4 border-t border-border sticky bottom-0 bg-background">
           <button
             type="button"
             onClick={onClose}
