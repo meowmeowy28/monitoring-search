@@ -238,58 +238,91 @@ function syncDriveWithSheet() {
   const linkCol = headers.indexOf("Folder Link");
 
   if (linkCol === -1) {
-    Logger.log("Could not find 'Folder Link' column — check SHEET_NAME/headers.");
+    Logger.log("Could not find 'Folder Link' column — check SHEET_NAME/headers. Aborting sync, no changes made.");
     return;
   }
 
-  // existing Sheet rows, keyed by their Folder Link
-  const sheetLinks = new Map();
+  // existing Sheet rows, keyed by the folder's actual Drive ID (not the raw
+  // link text — Drive can format the same folder's link slightly differently
+  // depending on how it was generated, which previously caused real folders
+  // to look "missing" and get wrongly deleted; the ID never changes)
+  const sheetRowsByFolderId = new Map();
   for (let r = 1; r < values.length; r++) {
     const link = values[r][linkCol];
-    if (link) sheetLinks.set(link, r + 1); // actual 1-indexed Sheet row number
+    const folderId = link ? extractFolderId(link) : null;
+    if (folderId) sheetRowsByFolderId.set(folderId, r + 1); // 1-indexed Sheet row number
   }
 
-  // walk Drive: root -> brand folders -> site-visit folders
-  const root = DriveApp.getFolderById(ROOT_FOLDER_ID);
-  const driveLinks = new Set();
+  // walk Drive: root -> brand folders -> site-visit folders.
+  // SAFETY: if anything goes wrong partway through this scan (a permissions
+  // hiccup, a folder that failed to load, etc.), we abort the ENTIRE sync
+  // and touch nothing — a partial/incomplete scan must never be allowed to
+  // make real folders look "missing" and get deleted.
+  const driveFolderIds = new Set();
   const rowsToAdd = [];
 
-  const brandFolders = root.getFolders();
-  while (brandFolders.hasNext()) {
-    const brandFolder = brandFolders.next();
-    const siteFolders = brandFolder.getFolders();
-    while (siteFolders.hasNext()) {
-      const siteFolder = siteFolders.next();
-      const url = siteFolder.getUrl();
-      driveLinks.add(url);
+  try {
+    const root = DriveApp.getFolderById(ROOT_FOLDER_ID);
+    const brandFolders = root.getFolders();
+    while (brandFolders.hasNext()) {
+      const brandFolder = brandFolders.next();
+      const siteFolders = brandFolder.getFolders();
+      while (siteFolders.hasNext()) {
+        const siteFolder = siteFolders.next();
+        const folderId = siteFolder.getId();
+        driveFolderIds.add(folderId);
 
-      if (!sheetLinks.has(url)) {
-        // found in Drive but not in the Sheet yet — someone added this
-        // folder by hand directly in Drive, so add a matching row
-        rowsToAdd.push([
-          brandFolder.getName(), // Brand
-          "",                    // Site — left blank, needs manual fill
-          "",                    // Panel
-          "",                    // Direction
-          "",                    // Date — left blank, needs manual fill
-          "",                    // Department
-          countImageFiles(siteFolder), // Photo Count
-          siteFolder.getName(),  // Folder Name (original)
-          url,                   // Folder Link
-          "YES",                 // Needs Review — since Site/Date are missing
-        ]);
+        if (!sheetRowsByFolderId.has(folderId)) {
+          // found in Drive but not in the Sheet yet — someone added this
+          // folder by hand directly in Drive, so add a matching row
+          rowsToAdd.push([
+            brandFolder.getName(), // Brand
+            "",                    // Site — left blank, needs manual fill
+            "",                    // Panel
+            "",                    // Direction
+            "",                    // Date — left blank, needs manual fill
+            "",                    // Department
+            countImageFiles(siteFolder), // Photo Count
+            siteFolder.getName(),  // Folder Name (original)
+            siteFolder.getUrl(),   // Folder Link
+            "YES",                 // Needs Review — since Site/Date are missing
+          ]);
+        }
       }
     }
+  } catch (err) {
+    Logger.log(`Sync ABORTED — error while scanning Drive: ${err.message}. No changes made, nothing was deleted.`);
+    return;
   }
 
   rowsToAdd.forEach((row) => sheet.appendRow(row));
 
-  // Sheet rows whose Drive folder is gone (deleted/trashed/moved) — remove them.
-  // Delete bottom-to-top so earlier row numbers don't shift as we go.
-  const rowsToDelete = [];
-  sheetLinks.forEach((rowNum, link) => {
-    if (!driveLinks.has(link)) rowsToDelete.push(rowNum);
+  // Sheet rows whose Drive folder genuinely no longer exists — candidates for removal.
+  const deleteCandidates = [];
+  sheetRowsByFolderId.forEach((rowNum, folderId) => {
+    if (!driveFolderIds.has(folderId)) deleteCandidates.push(rowNum);
   });
+
+  // SAFETY CAP: never let one sync run wipe out a large chunk of the Sheet
+  // at once. A handful of genuine deletions is normal; if the number looks
+  // suspiciously large, that's a sign something's wrong with the scan
+  // (not that dozens of folders really vanished from Drive simultaneously) —
+  // so we skip the deletions and just log a warning for a human to check,
+  // rather than silently wiping data.
+  const SAFE_DELETE_LIMIT = 5;
+  let rowsToDelete = [];
+  if (deleteCandidates.length > SAFE_DELETE_LIMIT) {
+    Logger.log(
+      `Sync found ${deleteCandidates.length} rows whose folders appear missing from Drive — ` +
+      `that's more than the safety limit of ${SAFE_DELETE_LIMIT}, so NONE were deleted automatically. ` +
+      `This usually means something's off with the scan rather than that many folders really being gone. ` +
+      `Check manually before deleting anything.`
+    );
+  } else {
+    rowsToDelete = deleteCandidates;
+  }
+
+  // delete bottom-to-top so earlier row numbers don't shift as we go
   rowsToDelete.sort((a, b) => b - a).forEach((rowNum) => sheet.deleteRow(rowNum));
 
   if (rowsToAdd.length > 0 || rowsToDelete.length > 0) {
