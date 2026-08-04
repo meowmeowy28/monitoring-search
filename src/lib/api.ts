@@ -1,8 +1,8 @@
 import { rowToEntry, type RawSheetRow, type Entry } from "@/types";
 
-// Deployed on the rebuilt account (previous account was suspended).
+// Same Apps Script Web App URL already deployed on the company account.
 export const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbx_d0M6KZAs7SkyMDF-BAkLPIIrmKG2Zfo1cq9Dcv3_b60V_CjgOswSlWO19YmscsfvkQ/exec";
+  "https://script.google.com/macros/s/AKfycbxJntnxypKbId06p05ryjGW5-JXHS2x78K68SnBU7Xiy7VS5JDsNy9Z94pb6jjzzj-D/exec";
 
 const ENTRIES_CACHE_KEY = "monitoring-search:entries-cache";
 

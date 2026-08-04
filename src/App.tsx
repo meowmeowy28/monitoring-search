@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search as SearchIcon, FolderX, AlertCircle, Camera as CameraIcon, Plus, Menu } from "lucide-react";
+import { Search as SearchIcon, FolderX, AlertCircle, Camera as CameraIcon, ScanLine, Plus, Menu } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import SearchBar, { type SortKey } from "@/components/SearchBar";
 import FolderCard from "@/components/FolderCard";
 import FolderDetail from "@/components/FolderDetail";
 import AddEntryModal from "@/components/AddEntryModal";
+import ScanEntryModal from "@/components/ScanEntryModal";
 import HomeView from "@/components/HomeView";
 import { fetchEntries, getCachedEntries } from "@/lib/api";
 import type { Entry } from "@/types";
@@ -23,7 +24,10 @@ export default function App() {
 
   const [selected, setSelected] = useState<(Entry & { id: string }) | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const knownBrands = useMemo(() => [...new Set(entries.map((e) => e.brand))].filter(Boolean), [entries]);
 
   const hasSearched = Boolean(query.trim() || brandFilter || departmentFilter);
 
@@ -108,13 +112,22 @@ export default function App() {
             {loading ? "Loading..." : `${entries.length} entries`}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="ml-auto flex items-center gap-1.5 text-sm px-2.5 sm:px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Add Folder</span>
-        </button>
+        <div className="ml-auto flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowScanModal(true)}
+            className="flex items-center gap-1.5 text-sm px-2.5 sm:px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <ScanLine className="w-4 h-4" />
+            <span className="hidden sm:inline">Scan</span>
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1.5 text-sm px-2.5 sm:px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Add Folder</span>
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 min-h-0">
@@ -190,6 +203,14 @@ export default function App() {
         <AddEntryModal
           onClose={() => setShowAddModal(false)}
           onAdded={loadEntries}
+        />
+      )}
+
+      {showScanModal && (
+        <ScanEntryModal
+          onClose={() => setShowScanModal(false)}
+          onAdded={loadEntries}
+          knownBrands={knownBrands}
         />
       )}
     </div>
