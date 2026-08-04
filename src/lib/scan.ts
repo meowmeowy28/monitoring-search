@@ -1,4 +1,51 @@
-import { createWorker } from "tesseract.js";
+import { createWorker, PSM } from "tesseract.js";
+
+/**
+ * Grayscales, contrast-stretches, and (for smaller photos) upscales the
+ * image before OCR. Billboard photos have glare, color clutter, and small
+ * distant text — this flattens all that into something Tesseract can read
+ * far more reliably than the raw color photo.
+ */
+function preprocessForOcr(imageDataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = img.width < 1200 ? 1.6 : 1;
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(imageDataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const data = imageData.data;
+      const gray = new Uint8ClampedArray(w * h);
+      let min = 255;
+      let max = 0;
+      for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+        const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        gray[p] = g;
+        if (g < min) min = g;
+        if (g > max) max = g;
+      }
+      const range = Math.max(max - min, 1);
+      for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+        const stretched = ((gray[p] - min) / range) * 255;
+        data[i] = data[i + 1] = data[i + 2] = stretched;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL("image/jpeg", 0.92));
+    };
+    img.onerror = () => resolve(imageDataUrl);
+    img.src = imageDataUrl;
+  });
+}
 
 /**
  * Runs text recognition on a captured photo (as a data URL) and returns
@@ -8,12 +55,23 @@ import { createWorker } from "tesseract.js";
  * saving it straight to a folder automatically.
  */
 export async function runOCR(imageDataUrl: string): Promise<string> {
+  const processed = await preprocessForOcr(imageDataUrl);
   const worker = await createWorker("eng");
   try {
-    const {
-      data: { text },
-    } = await worker.recognize(imageDataUrl);
-    return (text || "").trim();
+    // SPARSE_TEXT tells Tesseract to look for scattered blocks of text
+    // anywhere in the image, rather than assuming a well-formatted page —
+    // the right mode for a photo where text is one element among many
+    await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+    const { data } = await worker.recognize(processed);
+
+    // billboard photos produce a lot of low-confidence noise (background
+    // clutter, distant signage, watermarks) — keep only words Tesseract is
+    // reasonably sure about
+    const confidentWords = (data.words || [])
+      .filter((w) => w.confidence >= 55)
+      .map((w) => w.text);
+
+    return (confidentWords.join(" ") || data.text || "").trim();
   } finally {
     await worker.terminate();
   }

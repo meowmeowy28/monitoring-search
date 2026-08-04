@@ -1,8 +1,10 @@
 import { rowToEntry, type RawSheetRow, type Entry } from "@/types";
 
-// Same Apps Script Web App URL already deployed on the company account.
-export const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxJntnxypKbId06p05ryjGW5-JXHS2x78K68SnBU7Xiy7VS5JDsNy9Z94pb6jjzzj-D/exec";
+// Requests go through our own Worker at /api/backend, which forwards them to
+// the Apps Script backend server-side. This avoids a CORS issue with calling
+// Apps Script's /exec URL directly from the browser (see worker/index.ts for
+// why). Same backend, same data — just routed through our own origin.
+export const APPS_SCRIPT_URL = "/api/backend";
 
 const ENTRIES_CACHE_KEY = "monitoring-search:entries-cache";
 
