@@ -75,9 +75,15 @@ export interface DrivePhoto {
   url: string;
 }
 
-export function extractFolderId(driveUrl: string): string | null {
-  const match = driveUrl.match(/folders\/([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : null;
+export function extractFolderId(folderLink: string): string | null {
+  // OneDrive links: the item's Graph API id is tacked on as a URL fragment
+  // (#oid=...) by the backend when the row is created — see buildFolderLink
+  // in apps-script-backend-v3-onedrive.gs.
+  const oid = folderLink.match(/#oid=([^&]+)/);
+  if (oid) return decodeURIComponent(oid[1]);
+  // fallback: old Google Drive links from before the OneDrive migration
+  const drive = folderLink.match(/folders\/([a-zA-Z0-9_-]+)/);
+  return drive ? drive[1] : null;
 }
 
 // In-memory only (cleared on page refresh) — avoids refetching a folder's
