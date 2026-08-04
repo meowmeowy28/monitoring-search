@@ -317,7 +317,6 @@ export default function SocialCards({ cards }: SocialCardsProps) {
                   loading="lazy"
                   alt={card.alt || `Card ${index}`}
                   className="absolute inset-0 w-full h-full object-cover z-10"
-                  referrerPolicy="no-referrer"
                 />
               </div>
             );

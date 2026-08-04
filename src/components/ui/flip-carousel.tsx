@@ -95,7 +95,6 @@ export default function FlipCarousel({ cards, onImageClick }: FlipCarouselProps)
               alt={cards[index].alt || `Photo ${index + 1}`}
               className={`w-full h-full object-cover ${onImageClick ? "cursor-zoom-in" : ""}`}
               onClick={() => onImageClick?.(index)}
-              referrerPolicy="no-referrer"
             />
           </div>
         </div>
