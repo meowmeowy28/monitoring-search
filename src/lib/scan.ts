@@ -1,18 +1,26 @@
 import { createWorker, PSM } from "tesseract.js";
 
 /**
- * Grayscales, contrast-stretches, and (for smaller photos) upscales the
- * image before OCR. Billboard photos have glare, color clutter, and small
- * distant text — this flattens all that into something Tesseract can read
- * far more reliably than the raw color photo.
+ * Cleans up a raw camera photo before handing it to Tesseract. Field photos
+ * of billboards/signs tend to be low-contrast, a bit dark, and much higher
+ * resolution than the text on them needs — all things that make Tesseract
+ * guess random-looking letters instead of reading what's actually there.
+ * This: upscales small crops so letter strokes are thick enough to resolve,
+ * converts to grayscale, and pushes contrast so text separates cleanly from
+ * its background before recognition ever runs.
  */
-function preprocessForOcr(imageDataUrl: string): Promise<string> {
+function preprocessForOCR(imageDataUrl: string): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const scale = img.width < 1200 ? 1.6 : 1;
+      // Tesseract does best around 300dpi-equivalent text height — upscale
+      // modest-sized photos so small sign lettering has enough pixels to
+      // form recognizable strokes, but don't blow up already-large photos.
+      const minDim = 1600;
+      const scale = Math.min(2, Math.max(1, minDim / Math.max(img.width, img.height)));
       const w = Math.round(img.width * scale);
       const h = Math.round(img.height * scale);
+
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
@@ -25,22 +33,26 @@ function preprocessForOcr(imageDataUrl: string): Promise<string> {
 
       const imageData = ctx.getImageData(0, 0, w, h);
       const data = imageData.data;
-      const gray = new Uint8ClampedArray(w * h);
+
+      // grayscale + contrast stretch (min/max normalization) — makes faint
+      // or unevenly-lit text pop instead of blending into the background
       let min = 255;
       let max = 0;
+      const gray = new Uint8ClampedArray(w * h);
       for (let i = 0, p = 0; i < data.length; i += 4, p++) {
         const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
         gray[p] = g;
         if (g < min) min = g;
         if (g > max) max = g;
       }
-      const range = Math.max(max - min, 1);
+      const range = Math.max(1, max - min);
       for (let i = 0, p = 0; i < data.length; i += 4, p++) {
         const stretched = ((gray[p] - min) / range) * 255;
         data[i] = data[i + 1] = data[i + 2] = stretched;
       }
+
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL("image/jpeg", 0.92));
+      resolve(canvas.toDataURL("image/png"));
     };
     img.onerror = () => resolve(imageDataUrl);
     img.src = imageDataUrl;
@@ -55,23 +67,18 @@ function preprocessForOcr(imageDataUrl: string): Promise<string> {
  * saving it straight to a folder automatically.
  */
 export async function runOCR(imageDataUrl: string): Promise<string> {
-  const processed = await preprocessForOcr(imageDataUrl);
+  const cleaned = await preprocessForOCR(imageDataUrl);
   const worker = await createWorker("eng");
   try {
-    // SPARSE_TEXT tells Tesseract to look for scattered blocks of text
-    // anywhere in the image, rather than assuming a well-formatted page —
-    // the right mode for a photo where text is one element among many
+    // SPARSE_TEXT: billboards/signs are a few big words on an open
+    // background, not a paragraph — this segmentation mode looks for
+    // scattered text blocks instead of assuming one solid text block,
+    // which is what was causing letters to get jumbled/misread.
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-    const { data } = await worker.recognize(processed);
-
-    // billboard photos produce a lot of low-confidence noise (background
-    // clutter, distant signage, watermarks) — keep only words Tesseract is
-    // reasonably sure about
-    const confidentWords = (data.words || [])
-      .filter((w) => w.confidence >= 55)
-      .map((w) => w.text);
-
-    return (confidentWords.join(" ") || data.text || "").trim();
+    const {
+      data: { text },
+    } = await worker.recognize(cleaned);
+    return (text || "").trim();
   } finally {
     await worker.terminate();
   }

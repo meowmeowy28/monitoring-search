@@ -299,8 +299,10 @@ export default function ScanEntryModal({ onClose, onAdded, knownBrands }: ScanEn
                   <MapPin className="w-3 h-3" />
                   {locating
                     ? "Locating..."
+                    : site
+                    ? site
                     : coords
-                    ? `${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`
+                    ? "Location found, but couldn't identify place name"
                     : "GPS unavailable"}
                 </span>
               </div>
