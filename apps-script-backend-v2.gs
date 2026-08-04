@@ -130,7 +130,12 @@ function handleAdd(data) {
   (photos || []).forEach((p) => {
     const bytes = Utilities.base64Decode(p.base64Data);
     const blob = Utilities.newBlob(bytes, p.mimeType, p.name);
-    siteFolder.createFile(blob);
+    const file = siteFolder.createFile(blob);
+    // New files don't automatically inherit "Anyone with the link" sharing
+    // just because they live in a shared folder — without this line the
+    // thumbnail URL the website uses (getFolderPhotos) points at a private
+    // file and silently fails to load in the browser.
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   });
 
   // append the row, matching the Sheet's real column order exactly:

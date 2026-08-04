@@ -64,6 +64,7 @@ export default function Lightbox({ photos, index, onClose, onIndexChange }: Ligh
         alt={photos[index].alt || `Photo ${index + 1}`}
         className="max-w-[90vw] max-h-[85vh] object-contain"
         onClick={(e) => e.stopPropagation()}
+        referrerPolicy="no-referrer"
       />
 
       {total > 1 && (

@@ -1,8 +1,13 @@
 import { rowToEntry, type RawSheetRow, type Entry } from "@/types";
 
-// Same Apps Script Web App URL already deployed on the company account.
-export const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxJntnxypKbId06p05ryjGW5-JXHS2x78K68SnBU7Xiy7VS5JDsNy9Z94pb6jjzzj-D/exec";
+// Requests go through this site's own Worker at /api/backend, which
+// forwards them to Apps Script server-to-server. Apps Script Web Apps
+// can't send Access-Control-Allow-Origin headers on their own responses,
+// so calling them directly from the browser always gets blocked by CORS —
+// routing through our own domain avoids that entirely (same-origin, no
+// CORS check needed). See worker/index.ts for the proxy + the real
+// Apps Script URL.
+const API_BASE = "/api/backend";
 
 const ENTRIES_CACHE_KEY = "monitoring-search:entries-cache";
 
@@ -33,7 +38,7 @@ async function fetchWithRetry(url: string, init?: RequestInit, retries = 1): Pro
 }
 
 export async function fetchEntries(): Promise<(Entry & { id: string })[]> {
-  const res = await fetchWithRetry(APPS_SCRIPT_URL);
+  const res = await fetchWithRetry(API_BASE);
   const rows: RawSheetRow[] = await res.json();
   const entries = rows.map(rowToEntry).filter((e) => e.brand);
   try {
@@ -61,7 +66,7 @@ export interface NewEntryInput {
 }
 
 async function postToBackend(body: Record<string, unknown>): Promise<{ ok: boolean; error?: string; folderUrl?: string }> {
-  const res = await fetch(APPS_SCRIPT_URL, {
+  const res = await fetch(API_BASE, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -75,15 +80,9 @@ export interface DrivePhoto {
   url: string;
 }
 
-export function extractFolderId(folderLink: string): string | null {
-  // OneDrive links: the item's Graph API id is tacked on as a URL fragment
-  // (#oid=...) by the backend when the row is created — see buildFolderLink
-  // in apps-script-backend-v3-onedrive.gs.
-  const oid = folderLink.match(/#oid=([^&]+)/);
-  if (oid) return decodeURIComponent(oid[1]);
-  // fallback: old Google Drive links from before the OneDrive migration
-  const drive = folderLink.match(/folders\/([a-zA-Z0-9_-]+)/);
-  return drive ? drive[1] : null;
+export function extractFolderId(driveUrl: string): string | null {
+  const match = driveUrl.match(/folders\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
 }
 
 // In-memory only (cleared on page refresh) — avoids refetching a folder's
@@ -97,7 +96,7 @@ export async function fetchFolderPhotos(folderLink: string): Promise<DrivePhoto[
   const cached = photoCache.get(folderId);
   if (cached) return cached;
 
-  const res = await fetchWithRetry(`${APPS_SCRIPT_URL}?action=photos&folderId=${folderId}`);
+  const res = await fetchWithRetry(`${API_BASE}?action=photos&folderId=${folderId}`);
   const data = await res.json();
   const photos = Array.isArray(data) ? data : [];
   photoCache.set(folderId, photos);
